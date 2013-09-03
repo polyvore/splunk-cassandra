@@ -1,0 +1,29 @@
+<nav>
+    <view name="flashtimeline" default='true' />
+    <collection label="Searches &amp; Reports">
+		<collection label="Health">
+	        <saved source="unclassified" match="Cassandra"/>
+	        <saved source="unclassified" match="All"/>
+        </collection>
+        <collection label="Schema">
+	        <saved source="unclassified" match="Cluster"/>
+ 	        <saved source="unclassified" match="Column"/>
+	        <saved source="unclassified" match="Keyspace"/>
+	        <saved source="unclassified" match="Schema"/>
+	        <saved source="unclassified" match="configs"/>            
+        </collection> 
+		<collection label="CF Specific">
+	        <saved source="unclassified" match="User"/>
+	        <saved source="unclassified" match="flights"/>            
+        </collection>
+        <divider />
+    </collection>
+    <collection label="Troubleshoot">
+        <view name="cassandra_status"/>
+        <divider />
+    </collection>
+    <collection label="Explore">
+        <view name="cassandra_schema"/>
+        <divider />
+    </collection>
+</nav>

@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<dashboard>
+  <label>test3</label>
+  <row>
+    <chart>
+      <searchName>test2</searchName>
+      <title>test2</title>
+      <option name="charting.chart">bar</option>
+    </chart>
+  </row>
+</dashboard>

@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='utf-8'?>
+<dashboard>
+  <label>Cassandra Schema</label>
+  <row>
+    <table>
+      <searchString>| dbschema</searchString>
+      <title>Cluster Into</title>
+      <earliestTime>-5m</earliestTime>
+      <latestTime>now</latestTime>
+      <option name="charting.chart.nullValueMode">gaps</option>
+      <option name="charting.chart.stackMode">default</option>
+      <option name="charting.layout.splitSeries">false</option>
+      <option name="charting.legend.placement">right</option>
+      <option name="count">20</option>
+      <option name="displayRowNumbers">true</option>
+      <option name="drilldown">all</option>
+    </table>
+  </row>
+  <row>
+    <table>
+      <searchString>| dbdiscover</searchString>
+      <title>Keyspace Info</title>
+      <earliestTime>-5m</earliestTime>
+      <latestTime>now</latestTime>
+    </table>
+  </row>
+</dashboard>

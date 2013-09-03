@@ -1,0 +1,31 @@
+<form>
+    <label>Cluster Explorer</label>
+
+    <!-- define master search template, with replacement tokens delimited with $ -->
+    <searchTemplate>| dbschema $keyspace$ $column_family$</searchTemplate>
+    <earliestTime>-5m</earliestTime>
+    <latestTime>-0d</latestTime>
+
+    <fieldset>
+        <!-- Define a simple dropdown form driven by a search -->
+        <input type="dropdown" token="keyspace">
+            <label>Select Keyspace</label>
+            <populatingSearch fieldForValue="keyspace" fieldForLabel="keyspace"><![CDATA[| dbschema | table keyspace | search keyspace!="system*"  ]]></populatingSearch>
+            <choice value="*">Any</choice>
+        </input>
+        <input type="dropdown" token="column_family">
+           <label>Select Column Family or None for Describe Keyspace</label>
+           <populatingSearch fieldForValue="column_family" fieldForLabel="column_family"><![CDATA[index=cassidx source="Keyspace, schem*" | dedup column_family | table keyspace, column_family ]]></populatingSearch>
+           <choice value="ANY">None</choice>
+        </input>
+    </fieldset>
+
+    <row>
+        <!-- output the results as a 50 row events table -->
+        <table>
+            <title>Matching events</title>
+            <option name="count">50</option>
+        </table>
+    </row>
+
+</form>

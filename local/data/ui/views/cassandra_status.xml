@@ -1,0 +1,51 @@
+<?xml version='1.0' encoding='utf-8'?>
+<dashboard>
+  <label>Cassandra Status</label>
+  <row>
+    <table>
+      <searchName>Compactions last 24 hr</searchName>
+      <title>Compactions Last 24h</title>
+      <option name="charting.chart.nullValueMode">gaps</option>
+      <option name="charting.chart.stackMode">default</option>
+      <option name="charting.layout.splitSeries">false</option>
+      <option name="charting.legend.placement">left</option>
+      <option name="count">10</option>
+      <option name="displayRowNumbers">true</option>
+    </table>
+    <table>
+      <searchName>Flushes last 24hr</searchName>
+      <title>Flush Last 24h</title>
+      <option name="charting.chart.nullValueMode">gaps</option>
+      <option name="charting.chart.stackMode">default</option>
+      <option name="charting.layout.splitSeries">false</option>
+      <option name="charting.legend.placement">left</option>
+      <option name="count">10</option>
+      <option name="displayRowNumbers">true</option>
+    </table>
+  </row>
+  <row>
+    <table>
+      <searchString>index="casslogs" source="/var/log/cassandra/system.log" WARN</searchString>
+      <title>Warnings</title>
+      <earliestTime>-30d</earliestTime>
+      <latestTime>now</latestTime>
+    </table>
+    <event>
+      <searchName>Cassandra Errors</searchName>
+      <title>Cassandra Errors</title>
+    </event>
+  </row>
+  <row>
+    <table>
+      <searchString>index="casslogs" source="/var/log/cassandra/system.log"</searchString>
+      <title>Cassandra System Log</title>
+      <earliestTime>-30d</earliestTime>
+    </table>
+    <table>
+      <searchString>index="casslogs" source="/var/log/cassandra/cassandra.log" | table host, source, _raw</searchString>
+      <title>Cassandra Log</title>
+      <earliestTime>-90d</earliestTime>
+      <latestTime>now</latestTime>
+    </table>
+  </row>
+</dashboard>
