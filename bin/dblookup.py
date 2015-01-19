@@ -15,9 +15,11 @@
 # under the License.
 
 import csv
-import sys
+import sys, re
 
-import pycassa
+from cassandra import ConsistencyLevel
+from cassandra.cluster import Cluster
+from cassandra.query import dict_factory
 
 import settings
 from apputils import error, excinfo, Logger, parse
@@ -25,16 +27,44 @@ from apputils import error, excinfo, Logger, parse
 debug = False
 output = Logger(__file__) if debug else sys.stdout
 
-# Perform any needed data type conversions on the given row (dict)
-# UNDONE: Can we avoid the unicode to utf8 conversion below somehow?
-def convert(row):
-    for k,v in row.iteritems():
-        if isinstance(v, unicode):  # UNDONE: Why????
-            row[k] = v.encode("utf8")
-    return row
+def get_csv_input():
+    lines = []
+    for line in sys.stdin:
+        if line == "\n":
+            break
+        lines.append(line)
+    reader = csv.DictReader(lines)
+    return reader
+
+def row_fully_populated(dictrow):
+    for v in dictrow.values():
+        if v is None:
+            return False
+    return True
+
+def convert(value):
+    """
+    Tries to convert string-formatted numbers to integers or
+    floats directly
+    """
+    if isinstance(value, str):
+        if re.match(r'^\d+$', value):
+            return int(value)
+        if re.match(r'^\d+[,.]\d+$', value):
+            return float(value)
+    return value
+
+def key_combo(keys, dictrow):
+    keycombo = []
+    for k in keys:
+        if k in dictrow:
+            keycombo.append(convert(dictrow[k]))
+        else:
+            raise("Key %s is missing in input row %s" % (k, dictrow))
+    return keycombo
 
 def main(argv):
-    usage = "Usage: dblookup [options] {cfpath} {key}"
+    usage = "Usage: dblookup [options] {keyspace.table} {key1,key2}"
 
     args, kwargs = parse(argv)
 
@@ -50,70 +80,85 @@ def main(argv):
         error(output, "Invalid batchsize", 2)
     batchsize = int(batchsize)
 
-#    if len(args) < 2: 
-#        error(output, usage, 2)
+    if len(args) < 2:
+        error(output, usage, 2)
 
-    cfpath, keycol, fields = args
-    fields = fields.split(',')
+    cfpath, keycolumns = args
+    keycolumns = keycolumns.split(',')
+    #print("Key columns: %s" % keycolumns)
     cfpath = cfpath.split('.')
-    if len(cfpath) != 2: 
-        error(output, "Invalid column family path", 2)
+    if len(cfpath) != 2:
+        error(output, "Keyspace.table path should consist of 2 elements", 2)
     ksname, cfname = cfpath
-
+    lookup = None
+    reader = None
+    csvheader = None
     try:
-        server = "%s:%d" % (host, port)
-        pool = pycassa.connect(ksname, [server])
-        cfam = pycassa.ColumnFamily(pool, cfname)
-    except pycassa.cassandra.c08.ttypes.InvalidRequestException, e:
-        error(output, e.why, 2)
-    except pycassa.cassandra.c08.ttypes.NotFoundException, e:
-        error(output, e.why, 2)
+        reader = get_csv_input()
+        csvheader = reader.fieldnames
+        #TODO: make the config support a list of hosts!
+        #TODO: Make the protocol version cluster-dependent
+        cluster = Cluster(
+                [host],
+                port = port,
+                protocol_version = 1
+            )
+        #print("Connecting to cassandra")
+        session = cluster.connect(ksname)
+        session.row_factory = dict_factory
+        query = "SELECT %s FROM %s.%s WHERE" % (
+                                                ','.join(csvheader),
+                                                ksname,
+                                                cfname
+                                               )
+        fcnt = 0
+        for field in keycolumns:
+            if not field in csvheader:
+                error(output, "Key lookup field %s is missing in input data" % field)
+            fcnt += 1
+            if fcnt > 1:
+                query += " AND"
+            query += " %s=?" % field
+        #print("Preparing Cassandra lookup query: %s" % query)
+        lookup = session.prepare(query)
+        #TODO: Consistency level should be part of per-cluster config
+        lookup.consistency_level = ConsistencyLevel.LOCAL_QUORUM
     except:
         error(output, excinfo(), 2)
 
-    for line in sys.stdin:
-        if line == '\n': break
+    writer = csv.DictWriter(output, csvheader)
+    writer.writeheader()
 
-    reader = csv.DictReader(sys.stdin)
-    header = reader.fieldnames
-
-    if keycol not in header:
-        error(output, "Key field '%s' not found" % keycol, 2)
-
-    header.extend(fields)
-    writer = csv.DictWriter(output, header)
-    writer.writer.writerow(header)
-
+    unique_key_combos = {}
     while True:
         # Read up to `batchsize` rows and build key list for batch lookup
-        rows = []
-        keys = []
-        for i in xrange(batchsize):
-            try:
-                row = reader.next()
-            except StopIteration:
-                break
-            key = str(row[keycol])
-            keys.append(key)
-            rows.append(row)
-
-        if len(keys) == 0: 
-            break # All done
-
-        # Make a single multiget request for the batch of keys
-        keyset = set(keys) # Remove dups
-        values = cfam.multiget(keyset, columns=fields) 
-
-        # Merge the resulting dictionary with the original rows
-        for i in xrange(len(keys)):
-            value = values.get(keys[i], None)
-            if value is None: continue
-            rows[i].update(convert(value))
-
-        # Write extended rows back out in original order
-        for row in rows:
+        row = {}
+        try:
+            row = reader.next()
+        except StopIteration:
+            break
+        if row_fully_populated(row):
+            # this could also happen if the entire dict is empty still
+            # after reader.next
+            print("Row is fully populated, nothing to do: %s" % row)
+            writer.writerow(row)
+            continue
+        #print("Got input row: %s" % row)
+        keycombo = key_combo(keycolumns, row)
+        keysig = '-'.join(str(keycombo))
+        if not keysig in unique_key_combos:
+            # a new key combination
+            #print("db fetch")
+            values = session.execute(lookup, keycombo)
+            unique_key_combos[keysig] = values
+        if len(unique_key_combos[keysig]) > 0:
+            for result in unique_key_combos[keysig]:
+                row.update(result)
+                writer.writerow(row)
+        else:
             writer.writerow(row)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+
 
