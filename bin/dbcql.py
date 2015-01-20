@@ -82,7 +82,7 @@ def main(argv):
             writer = None
             rows = session.execute(expression)
             if not rows:
-                # Statments like 'use' don't return results
+                # Statements like 'use' don't return results
                 continue
             for row in rows:
                 if not writer:
