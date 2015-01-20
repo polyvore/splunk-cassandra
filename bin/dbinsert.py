@@ -17,7 +17,7 @@
 import csv
 import sys
 
-import pycassa
+from cassandra.cluster import Cluster
 
 import settings
 from apputils import error, excinfo, Logger, parse
@@ -25,13 +25,19 @@ from apputils import error, excinfo, Logger, parse
 debug = False
 output = Logger(__file__) if debug else sys.stdout
 
-# Perform any needed data type conversions on the given row (dict)
-# UNDONE: Can we avoid the unicode to utf8 conversion below somehow?
 def convert(row):
+    """
+    Perform any needed data type conversions on the given row (dict).
+
+    This is necessary because python csv module does not intepret type,
+    so our integers on sys.stdin become strings.
+    """
+
     for k,v in row.iteritems():
-        if isinstance(v, unicode):  # UNDONE: Why????
-            row[k] = v.encode("utf8")
+        if v.isdigit():
+            row[k] = int(v)
     return row
+# End convert
 
 def main(argv):
     usage = "Usage: dbinsert [options] {cfpath} {key} {fields}"
@@ -55,23 +61,33 @@ def main(argv):
 
     cfpath, keycol, fields = args
     fields = fields.split(',')
-    cfpath = cfpath.split('.')
+    cfpath = cfpath.split('.', 1)
     if len(cfpath) != 2: 
         error(output, "Invalid column family path", 2)
     ksname, cfname = cfpath
 
+    # NOTE: Cassandra driver docs say that when using protocol version 1,
+    # protocol-level batch operations aren't available. Awooo... ;_;
+    # http://planetcassandra.org/blog/datastax-python-driver-2-0-released/
+    # http://datastax.github.io/python-driver/api/cassandra/cluster.html
     try:
-        server = "%s:%d" % (host, port)
-        pool = pycassa.connect(ksname, [server])
-        cfam = pycassa.ColumnFamily(pool, cfname)
-    except pycassa.cassandra.c08.ttypes.InvalidRequestException, e:
-        error(output, e.why, 2)
-    except pycassa.cassandra.c08.ttypes.NotFoundException, e:
-        error(output, e.why, 2)
+        cluster = Cluster(
+            [host],
+            port=port,
+            protocol_version = 1 # TODO: Option for protocol version
+        )
+        session = cluster.connect(ksname)
     except:
         error(output, excinfo(), 2)
 
     for line in sys.stdin:
+        # NOTE: This discards the splunk-related job info that is
+        # sent to the script prior to the actual header that
+        # we're interested in.
+        #
+        # Doing this will break compatibility with running this
+        # from the CLI, unless you prepend a newline character
+        # to your input.
         if line == '\n': break
 
     reader = csv.DictReader(sys.stdin)
@@ -89,14 +105,18 @@ def main(argv):
     writer = csv.DictWriter(output, header)
     writer.writer.writerow(header)
 
-    # The pycassa batch context manager will automatically transmit updates 
-    # when `queue_size` is reached and when the context manager exits.
-    with cfam.batch(queue_size=batchsize) as batch:
-        for row in reader:
-            key = row[keycol]
-            record = dict([(k, v) for k, v in row.iteritems() if k in fields])
-            batch.insert(key, record)
-            writer.writerow(row)
+    for row in reader:
+        record = dict([(k, v) for k, v in row.iteritems() if k in fields])
+        # Cast strings that are integers to int
+        record = convert(record)
+
+        # Build an insert statement that we can use a dictionary with
+        query = 'INSERT INTO %s (%s) ' % (cfname, ', '.join(record.keys()))
+        values_string = ', '.join(['%(' + col + ')s' for col in record.keys()])
+        query += 'VALUES (%s)' % values_string
+
+        session.execute(query, record)
+        writer.writerow(row)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
