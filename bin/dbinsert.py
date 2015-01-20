@@ -46,6 +46,7 @@ def main(argv):
 
     host = kwargs.get('host', settings.DEFAULT_CASSANDRA_HOST)
     port = kwargs.get('port', settings.DEFAULT_CASSANDRA_PORT)
+    ttl = int(kwargs.get('ttl', None))
     batchsize = kwargs.get('batchsize', settings.DEFAULT_BATCHSIZE)
 
     if not port.isdigit():
@@ -114,6 +115,9 @@ def main(argv):
         query = 'INSERT INTO %s (%s) ' % (cfname, ', '.join(record.keys()))
         values_string = ', '.join(['%(' + col + ')s' for col in record.keys()])
         query += 'VALUES (%s)' % values_string
+        # Add TTL, if one was given
+        if ttl:
+            query += ' USING TTL %d' % ttl
 
         session.execute(query, record)
         writer.writerow(row)
