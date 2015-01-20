@@ -21,7 +21,9 @@
 import csv
 import sys
 
-from pycassa.system_manager import SystemManager
+from cassandra.cluster import Cluster
+from cassandra.query import dict_factory
+from cassandra import ConsistencyLevel
 
 import settings
 from apputils import error, excinfo, Logger, parse
@@ -29,96 +31,45 @@ from apputils import error, excinfo, Logger, parse
 debug = False
 output = Logger(__file__) if debug else sys.stdout
 
-# Lists the Keyspaces of the current cassandra instance
-def get_details(system):
-    ksprops = system.get_keyspace_properties("system").keys()
-    header = ["keyspace"] + sorted(ksprops)
-    writer = csv.writer(output)
-    writer.writer.writerow(header)
-
-    for keyspace in system.list_keyspaces():
-        ksinfo = system.get_keyspace_column_families(keyspace, use_dict_for_col_metadata=True)
-        attrs = [
-            "id",
-            "column_type",
-            "comment",
-            "comparator_type",
-            "default_validation_class",
-            "gc_grace_seconds",
-            "key_alias",
-            "key_cache_save_period_in_seconds",
-            "key_cache_size",
-            "key_validation_class",
-            "max_compaction_threshold",
-            "memtable_operations_in_millions",
-            "memtable_throughput_in_mb",
-            "memtable_flush_after_mins",
-            "merge_shards_chance",
-            "min_compaction_threshold",
-            "read_repair_chance",
-            "replicate_on_write",
-            "row_cache_provider",
-            "row_cache_save_period_in_seconds",
-            "row_cache_size",
-            "subcomparator_type",
-        ]
-
-        for cfname, cfdef in ksinfo.iteritems():
-            ks = ("keyspace="+ keyspace)
-            cf = ("column_family="+ cfname)
-            row =(ks, cf)
-            writer.writerow(row)
-
 def main(argv):
     usage = "Usage: dbdiscover.py"
     
     args, kwargs = parse(argv)
 
     host = kwargs.get('host', settings.DEFAULT_CASSANDRA_HOST)
-    port = kwargs.get('port', settings.DEFAULT_CASSANDRA_PORT)
+    port = int(kwargs.get('port', settings.DEFAULT_CASSANDRA_PORT))
 
     try:
-        system = SystemManager("%s:%s" % (host, port))
-        ksprops = system.get_keyspace_properties("system").keys()
-#        header = ["keyspace"] + sorted(ksprops)
+        cluster = Cluster(
+            [host],
+            port=port,
+            protocol_version = 1 # TODO: Option for protocol version
+        )
+        session = cluster.connect()
+        session.row_factory = dict_factory
+
+        # Get keyspaces
+        rows = session.execute('select keyspace_name from system.schema_keyspaces')
+        keyspaces = [x['keyspace_name'] for x in rows]
+
         header = ["keyspace", "column_family"]
         writer = csv.writer(output)
         writer.writerow(header)
 
-        for keyspace in system.list_keyspaces():
-            ksinfo = system.get_keyspace_column_families(keyspace, use_dict_for_col_metadata=True)
-            attrs = [
-            "id",
-            "column_type",
-            "comment",
-            "comparator_type",
-            "default_validation_class",
-            "gc_grace_seconds",
-            "key_alias",
-            "key_cache_save_period_in_seconds",
-            "key_cache_size",
-            "key_validation_class",
-            "max_compaction_threshold",
-            "memtable_operations_in_millions",
-            "memtable_throughput_in_mb",
-            "memtable_flush_after_mins",
-            "merge_shards_chance",
-            "min_compaction_threshold",
-            "read_repair_chance",
-            "replicate_on_write",
-            "row_cache_provider",
-            "row_cache_save_period_in_seconds",
-            "row_cache_size",
-            "subcomparator_type",
-            ]
+        # Prepared statement for column family names in keyspace
+        column_families = session.prepare("select columnfamily_name from system.schema_columnfamilies where keyspace_name=?")
+        # TODO: Option for setting consistency level
+        column_families.consistency_level = ConsistencyLevel.LOCAL_QUORUM
 
-            for cfname, cfdef in ksinfo.iteritems():
+        for keyspace in keyspaces:
+            rows = session.execute(column_families, [keyspace])
+            names = [x['columnfamily_name'] for x in rows]
+
+            for cfname in names:
                 ks = ("keyspace="+ keyspace)
                 cf = ("column_family="+ cfname)
                 row =(ks, cf)
                 writer.writerow(row)
-
-
         return
 
     except:
