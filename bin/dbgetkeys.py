@@ -22,7 +22,8 @@ import csv
 import sys
 import pycassa
 
-from pycassa.system_manager import SystemManager
+from cassandra.cluster import Cluster
+from cassandra.query import dict_factory
 
 import settings
 from apputils import error, excinfo, Logger, parse
@@ -36,35 +37,35 @@ def main(argv):
     args, kwargs = parse(argv)
 
     host = kwargs.get('host', settings.DEFAULT_CASSANDRA_HOST)
-    port = kwargs.get('port', settings.DEFAULT_CASSANDRA_PORT)
+    port = int(kwargs.get('port', settings.DEFAULT_CASSANDRA_PORT))
 
     if len(argv) == 2:
         ksname = argv[0]
         cfname = argv[1]
 
     try:
-        server = "%s:%s" % (host, port)
-        pool = pycassa.connect(ksname, [server])
-        cfam = pycassa.ColumnFamily(pool, cfname)
-    except pycassa.cassandra.c08.ttypes.InvalidRequestException, e:
-        error(output, e.why, 2)
-    except pycassa.cassandra.c08.ttypes.NotFoundException, e:
-        error(output, e.why, 2)
+        cluster = Cluster(
+            [host],
+            port=port,
+            protocol_version = 1 # TODO: Option for protocol version
+        )
+        session = cluster.connect(ksname)
+        session.row_factory = dict_factory
+
     except:
         error(output, excinfo(), 2)
 
     # Get All Keys for given cf
+    header = None
+    writer = None
+    rows = session.execute('select * from %s' % '.'.join([ksname, cfname]))
 
-    header = ["Keyspace","Column_Family","Key"]
-    writer = csv.writer(output)
-    writer.writerow(header)
-    ks = ("keyspace="+ ksname)
-    cf = ("column_family="+ cfname)
-
-    for value in cfam.get_range(column_count=0):
-         key = ("Key="+ value[0])
-         row = (ks, cf, key)
-         writer.writerow(row)
+    for row in rows:
+        if not header:
+            header = row.keys()
+            writer = csv.DictWriter(output, header)
+            writer.writeheader()
+        writer.writerow(row)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
