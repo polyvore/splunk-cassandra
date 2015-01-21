@@ -237,3 +237,45 @@ export = none
 owner = admin
 version = 5.0.1
 modtime = 1378211681.863807000
+
+[commands/dbcqlschema]
+access = read : [ * ], write : [ admin, power ]
+export = system
+owner = nobody
+version = 6.2.1
+modtime = 1421870505.343704000
+
+[commands/dbcqllookup]
+access = read : [ * ], write : [ admin, power ]
+export = system
+owner = nobody
+version = 6.2.1
+modtime = 1421870514.521144000
+
+[commands/dbcqlinsert]
+access = read : [ * ], write : [ admin, power ]
+export = system
+owner = nobody
+version = 6.2.1
+modtime = 1421870521.410748000
+
+[commands/dbcqlgetkeys]
+access = read : [ * ], write : [ admin, power ]
+export = system
+owner = nobody
+version = 6.2.1
+modtime = 1421870527.749139000
+
+[commands/dbcqldiscover]
+access = read : [ * ], write : [ admin, power ]
+export = system
+owner = nobody
+version = 6.2.1
+modtime = 1421870534.019687000
+
+[commands/dbcql]
+access = read : [ * ], write : [ admin, power ]
+export = system
+owner = nobody
+version = 6.2.1
+modtime = 1421870547.712971000
