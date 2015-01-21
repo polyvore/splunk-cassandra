@@ -32,6 +32,8 @@ def get_csv_input():
     for line in sys.stdin:
         if line == "\n":
             break
+    
+    for line in sys.stdin:
         lines.append(line)
     reader = csv.DictReader(lines)
     return reader
@@ -106,8 +108,7 @@ def main(argv):
         #print("Connecting to cassandra")
         session = cluster.connect(ksname)
         session.row_factory = dict_factory
-        query = "SELECT %s FROM %s.%s WHERE" % (
-                                                ','.join(csvheader),
+        query = "SELECT * FROM %s.%s WHERE" % (
                                                 ksname,
                                                 cfname
                                                )
@@ -140,7 +141,7 @@ def main(argv):
         if row_fully_populated(row):
             # this could also happen if the entire dict is empty still
             # after reader.next
-            print("Row is fully populated, nothing to do: %s" % row)
+            #print("Row is fully populated, nothing to do: %s" % row)
             writer.writerow(row)
             continue
         #print("Got input row: %s" % row)
