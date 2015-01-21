@@ -15,7 +15,7 @@
 # under the License.
 
 import csv
-import sys
+import sys, re
 
 from cassandra.cluster import Cluster
 
@@ -30,12 +30,15 @@ def convert(row):
     Perform any needed data type conversions on the given row (dict).
 
     This is necessary because python csv module does not intepret type,
-    so our integers on sys.stdin become strings.
+    so our integers/floats on sys.stdin become strings.
     """
 
     for k,v in row.iteritems():
-        if v.isdigit():
-            row[k] = int(v)
+        if isinstance(v, str):
+            if v.isdigit():
+                row[k] = int(v)
+            elif re.match(r'^\d+[,\.]\d+$', v):
+                row[k] = float(v)
     return row
 # End convert
 
