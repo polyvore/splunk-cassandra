@@ -43,8 +43,7 @@ def parse(argv):
         if not re.match(r'^[\w\-]+=[\w\-]+$', item):
             args.append(item)
         else:
-            key = item[:equals]
-            value = item[equals+1:]
+            key, value = item.split('=', 1)
             kwargs[key] = value
     return args, kwargs
 
