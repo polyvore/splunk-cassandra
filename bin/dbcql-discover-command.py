@@ -16,4 +16,4 @@
 
 from extern import extern
 
-extern("dbdiscover.py")
+extern("dbcql-discover.py")

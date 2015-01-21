@@ -16,4 +16,4 @@
 
 from extern import extern
 
-extern("dbinsert.py")
+extern("dbcql-insert.py")

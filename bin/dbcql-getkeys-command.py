@@ -16,4 +16,4 @@
 
 from extern import extern
 
-extern("dbgetkeys.py")
+extern("dbcql-getkeys.py")

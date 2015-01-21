@@ -16,4 +16,4 @@
 
 from extern import extern
 
-extern("dblookup.py")
+extern("dbcql-lookup.py")

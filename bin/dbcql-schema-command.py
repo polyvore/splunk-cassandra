@@ -16,4 +16,4 @@
 
 from extern import extern
 
-extern("dbschema.py")
+extern("dbcql-schema.py")
