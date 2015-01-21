@@ -14,6 +14,7 @@
 
 import csv
 import sys
+import re
 import traceback
 
 def excinfo():
@@ -39,8 +40,7 @@ def parse(argv):
         if len(item) > 1 and item.startswith('"') and item.endswith('"'):
             args.append(item[1:-1])
             continue
-        equals = item.find('=')
-        if equals == -1:
+        if not re.match(r'^[\w\-]+=[\w\-]+$', item):
             args.append(item)
         else:
             key = item[:equals]
