@@ -50,7 +50,7 @@ def convert(value):
     if isinstance(value, str):
         if value.isdigit():
             return int(value)
-        elif re.match(r'^\d+[,.]\d+$', value):
+        elif re.match(r'^\d+[,\.]\d+$', value):
             return float(value)
     return value
 
