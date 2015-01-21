@@ -66,7 +66,7 @@ def key_combo(keys, dictrow):
     return keycombo
 
 def main(argv):
-    usage = "Usage: dblookup [options] {keyspace.table} {key1,key2}"
+    usage = "Usage: dblookup [options] {keyspace.table} {key1,key2} {include col1, include col2}"
 
     args, kwargs = parse(argv)
 
@@ -82,11 +82,12 @@ def main(argv):
         error(output, "Invalid batchsize", 2)
     batchsize = int(batchsize)
 
-    if len(args) < 2:
+    if len(args) < 3:
         error(output, usage, 2)
 
-    cfpath, keycolumns = args
+    cfpath, keycolumns, outcolumns = args
     keycolumns = keycolumns.split(',')
+    outcolumns = outcolumns.split(',')
     #print("Key columns: %s" % keycolumns)
     cfpath = cfpath.split('.')
     if len(cfpath) != 2:
@@ -108,7 +109,8 @@ def main(argv):
         #print("Connecting to cassandra")
         session = cluster.connect(ksname)
         session.row_factory = dict_factory
-        query = "SELECT * FROM %s.%s WHERE" % (
+        query = "SELECT %s FROM %s.%s WHERE" % (
+                                                ', '.join(set(keycolumns + outcolumns)),
                                                 ksname,
                                                 cfname
                                                )
@@ -127,7 +129,7 @@ def main(argv):
     except:
         error(output, excinfo(), 2)
 
-    writer = csv.DictWriter(output, csvheader)
+    writer = csv.DictWriter(output, set(keycolumns + outcolumns))
     writer.writeheader()
 
     unique_key_combos = {}
@@ -138,12 +140,6 @@ def main(argv):
             row = reader.next()
         except StopIteration:
             break
-        if row_fully_populated(row):
-            # this could also happen if the entire dict is empty still
-            # after reader.next
-            #print("Row is fully populated, nothing to do: %s" % row)
-            writer.writerow(row)
-            continue
         #print("Got input row: %s" % row)
         keycombo = key_combo(keycolumns, row)
         keysig = '-'.join(str(keycombo))
