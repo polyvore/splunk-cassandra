@@ -51,6 +51,7 @@ def main(argv):
     if type(hosts) is str:
         hosts = hosts.split(',')
     port = kwargs.get('port', settings.DEFAULT_CASSANDRA_PORT)
+    protocol = int(kwargs.get('protocol', settings.DEFAULT_PROTOCOL_VERSION))
     ttl = int(kwargs.get('ttl', None))
     batchsize = kwargs.get('batchsize', settings.DEFAULT_BATCHSIZE)
 
@@ -80,7 +81,7 @@ def main(argv):
         cluster = Cluster(
             hosts,
             port=port,
-            protocol_version = 1 # TODO: Option for protocol version
+            protocol_version = protocol
         )
         session = cluster.connect(ksname)
     except:

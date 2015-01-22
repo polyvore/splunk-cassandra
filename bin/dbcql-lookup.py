@@ -71,6 +71,7 @@ def main(argv):
     if type(hosts) is str:
         hosts = hosts.split(',')
     port = kwargs.get('port', settings.DEFAULT_CASSANDRA_PORT)
+    protocol = int(kwargs.get('protocol', settings.DEFAULT_PROTOCOL_VERSION))
     batchsize = kwargs.get('batchsize', settings.DEFAULT_BATCHSIZE)
 
     if not port.isdigit():
@@ -102,7 +103,7 @@ def main(argv):
         cluster = Cluster(
                 hosts,
                 port = port,
-                protocol_version = 1
+                protocol_version = protocol
             )
         #print("Connecting to cassandra")
         session = cluster.connect(ksname)

@@ -40,6 +40,7 @@ def main(argv):
     if type(hosts) is str:
         hosts = hosts.split(',')
     port = int(kwargs.get('port', settings.DEFAULT_CASSANDRA_PORT))
+    protocol = int(kwargs.get('protocol', settings.DEFAULT_PROTOCOL_VERSION))
 
     if len(argv) == 2:
         ksname = argv[0]
@@ -49,7 +50,7 @@ def main(argv):
         cluster = Cluster(
             hosts,
             port=port,
-            protocol_version = 1 # TODO: Option for protocol version
+            protocol_version = protocol
         )
         session = cluster.connect(ksname)
         session.row_factory = dict_factory
