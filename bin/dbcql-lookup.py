@@ -33,10 +33,7 @@ def get_csv_input():
         if line == "\n":
             break
     
-    for line in sys.stdin:
-        lines.append(line)
-    reader = csv.DictReader(lines)
-    return reader
+    return csv.DictReader(sys.stdin)
 
 def row_fully_populated(dictrow):
     for v in dictrow.values():
