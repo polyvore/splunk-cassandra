@@ -42,6 +42,7 @@ def main(argv):
     if type(hosts) is str:
         hosts = hosts.split(',')
     port = int(kwargs.get('port', settings.DEFAULT_CASSANDRA_PORT))
+    protocol = int(kwargs.get('protocol', settings.DEFAULT_PROTOCOL_VERSION))
     # UNDONE: credentials ..
 
     query = args[0]
@@ -72,7 +73,7 @@ def main(argv):
         cluster = Cluster(
             hosts,
             port=port,
-            protocol_version = 1 # TODO: Option for protocol version
+            protocol_version = protocol
         )
         session = cluster.connect(keyspace)
         # Results returned as list of dicts. Can use other formats specified here:
