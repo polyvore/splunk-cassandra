@@ -89,6 +89,7 @@ def main(argv):
     keycolumns = keycolumns.split(',')
     outcolumns = outcolumns.split(',')
     #print("Key columns: %s" % keycolumns)
+    #print("Out columns: %s" % outcolumns)
     cfpath = cfpath.split('.')
     if len(cfpath) != 2:
         error(output, "Keyspace.table path should consist of 2 elements", 2)
@@ -99,6 +100,7 @@ def main(argv):
     try:
         reader = get_csv_input()
         csvheader = reader.fieldnames
+        #print("Header: %s" % csvheader)
         #TODO: Make the protocol version cluster-dependent
         cluster = Cluster(
                 hosts,
@@ -128,7 +130,9 @@ def main(argv):
     except:
         error(output, excinfo(), 2)
 
-    writer = csv.DictWriter(output, set(keycolumns + outcolumns))
+    # Allow for columns not related to lookup to be included in output
+    # (include input csv header in output csv header)
+    writer = csv.DictWriter(output, set(keycolumns + outcolumns + csvheader))
     writer.writeheader()
 
     unique_key_combos = {}
