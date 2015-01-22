@@ -54,6 +54,9 @@ def convert(value):
     return value
 
 def key_combo(keys, dictrow):
+    """
+    Returns a set of keys that identify a unique lookup.
+    """
     keycombo = []
     for k in keys:
         if k in dictrow:
@@ -135,6 +138,9 @@ def main(argv):
     writer = csv.DictWriter(output, set(keycolumns + outcolumns + csvheader))
     writer.writeheader()
 
+    input_rows = 0
+    cache_hits = 0
+
     unique_key_combos = {}
     while True:
         # Read up to `batchsize` rows and build key list for batch lookup
@@ -143,14 +149,18 @@ def main(argv):
             row = reader.next()
         except StopIteration:
             break
+        else:
+            input_rows += 1
         #print("Got input row: %s" % row)
         keycombo = key_combo(keycolumns, row)
-        keysig = '-'.join(str(keycombo))
+        keysig = '-'.join(sorted([str(x) for x in keycombo]))
         if not keysig in unique_key_combos:
             # a new key combination
             #print("db fetch")
             values = session.execute(lookup, keycombo)
             unique_key_combos[keysig] = values
+        else:
+            cache_hits += 1
         if len(unique_key_combos[keysig]) > 0:
             for result in unique_key_combos[keysig]:
                 row.update(result)
