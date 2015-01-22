@@ -38,7 +38,9 @@ def main(argv):
         error(output, "Unexpected argument: '%s'" % args[1], 2)
 
     keyspace = kwargs.get('keyspace', None)
-    host = kwargs.get('host', settings.DEFAULT_CASSANDRA_HOST)
+    hosts = kwargs.get('hosts', settings.DEFAULT_CASSANDRA_HOSTS)
+    if type(hosts) is str:
+        hosts = hosts.split(',')
     port = int(kwargs.get('port', settings.DEFAULT_CASSANDRA_PORT))
     # UNDONE: credentials ..
 
@@ -68,7 +70,7 @@ def main(argv):
     session = None
     try:
         cluster = Cluster(
-            [host],
+            hosts,
             port=port,
             protocol_version = 1 # TODO: Option for protocol version
         )

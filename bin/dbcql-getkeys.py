@@ -16,7 +16,7 @@
 
 """A custom search command that presents metadata for a Cassandra instance."""
 
-# UNDONE: Support for optional host/port command line args
+# UNDONE: Support for optional hosts/port command line args
 
 import csv
 import sys
@@ -36,7 +36,9 @@ def main(argv):
 
     args, kwargs = parse(argv)
 
-    host = kwargs.get('host', settings.DEFAULT_CASSANDRA_HOST)
+    hosts = kwargs.get('hosts', settings.DEFAULT_CASSANDRA_HOSTS)
+    if type(hosts) is str:
+        hosts = hosts.split(',')
     port = int(kwargs.get('port', settings.DEFAULT_CASSANDRA_PORT))
 
     if len(argv) == 2:
@@ -45,7 +47,7 @@ def main(argv):
 
     try:
         cluster = Cluster(
-            [host],
+            hosts,
             port=port,
             protocol_version = 1 # TODO: Option for protocol version
         )

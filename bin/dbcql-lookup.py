@@ -67,7 +67,9 @@ def main(argv):
 
     args, kwargs = parse(argv)
 
-    host = kwargs.get('host', settings.DEFAULT_CASSANDRA_HOST)
+    hosts = kwargs.get('hosts', settings.DEFAULT_CASSANDRA_HOSTS)
+    if type(hosts) is str:
+        hosts = hosts.split(',')
     port = kwargs.get('port', settings.DEFAULT_CASSANDRA_PORT)
     batchsize = kwargs.get('batchsize', settings.DEFAULT_BATCHSIZE)
 
@@ -96,10 +98,9 @@ def main(argv):
     try:
         reader = get_csv_input()
         csvheader = reader.fieldnames
-        #TODO: make the config support a list of hosts!
         #TODO: Make the protocol version cluster-dependent
         cluster = Cluster(
-                [host],
+                hosts,
                 port = port,
                 protocol_version = 1
             )

@@ -47,7 +47,9 @@ def main(argv):
 
     args, kwargs = parse(argv)
 
-    host = kwargs.get('host', settings.DEFAULT_CASSANDRA_HOST)
+    hosts = kwargs.get('hosts', settings.DEFAULT_CASSANDRA_HOSTS)
+    if type(hosts) is str:
+        hosts = hosts.split(',')
     port = kwargs.get('port', settings.DEFAULT_CASSANDRA_PORT)
     ttl = int(kwargs.get('ttl', None))
     batchsize = kwargs.get('batchsize', settings.DEFAULT_BATCHSIZE)
@@ -76,7 +78,7 @@ def main(argv):
     # http://datastax.github.io/python-driver/api/cassandra/cluster.html
     try:
         cluster = Cluster(
-            [host],
+            hosts,
             port=port,
             protocol_version = 1 # TODO: Option for protocol version
         )
