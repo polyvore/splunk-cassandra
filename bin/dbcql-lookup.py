@@ -16,6 +16,7 @@
 
 import csv
 import sys, re
+from Queue import Queue
 
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
@@ -140,10 +141,15 @@ def main(argv):
 
     input_rows = 0
     cache_hits = 0
+    queue_puts = 0
+    queue_full_gets = 0
+    queue_drain_gets = 0
+
+    # A queue for storing handles to asynchronous queries
+    async_query_queue = Queue(maxsize=(40 * len(hosts)) + 1)
 
     unique_key_combos = {}
     while True:
-        # Read up to `batchsize` rows and build key list for batch lookup
         row = {}
         try:
             row = reader.next()
@@ -151,22 +157,54 @@ def main(argv):
             break
         else:
             input_rows += 1
+
+            if async_query_queue.full():
+                # Block until a query is finished, when the queue is full
+                (stored_row, stored_keysig, old_future) = async_query_queue.get_nowait()
+                values = old_future.result()
+                unique_key_combos[stored_keysig] = values
+                queue_full_gets += 1
+                if len(values) > 0:
+                    for result in values:
+                        stored_row.update(result)
+                        writer.writerow(stored_row)
+                else:
+                    writer.writerow(stored_row)
+
         #print("Got input row: %s" % row)
         keycombo = key_combo(keycolumns, row)
-        keysig = '-'.join(sorted([str(x) for x in keycombo]))
+        keysig = '-'.join(cfpath + sorted([str(x) for x in keycombo]))
         if not keysig in unique_key_combos:
             # a new key combination
             #print("db fetch")
-            values = session.execute(lookup, keycombo)
-            unique_key_combos[keysig] = values
+            future = session.execute_async(lookup, keycombo)
+            async_query_queue.put_nowait((row, keysig, future))
+
         else:
             cache_hits += 1
-        if len(unique_key_combos[keysig]) > 0:
-            for result in unique_key_combos[keysig]:
-                row.update(result)
+
+            if len(unique_key_combos[keysig]) > 0:
+                for result in unique_key_combos[keysig]:
+                    row.update(result)
+                    writer.writerow(row)
+            else:
                 writer.writerow(row)
+
+    while not async_query_queue.empty():
+        # Drain the remainder of the queue
+        (stored_row, stored_keysig, old_future) = async_query_queue.get_nowait()
+        values = old_future.result()
+        # NOTE: If using persistent cache between calls of this script (memcached),
+        # set cache value here too
+        queue_drain_gets += 1
+        if len(values) > 0:
+            for result in values:
+                stored_row.update(result)
+                writer.writerow(stored_row)
         else:
-            writer.writerow(row)
+            writer.writerow(stored_row)
+
+    #print('input rows %d cache hits %d queue puts %s queue_full gets %s queue_drain gets %d' % (input_rows, cache_hits, queue_puts, queue_full_gets, queue_drain_gets))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
