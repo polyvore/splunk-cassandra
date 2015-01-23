@@ -22,6 +22,8 @@ from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
 
+import pylibmc
+
 import settings
 from apputils import error, excinfo, Logger, parse
 
@@ -104,6 +106,13 @@ def main(argv):
     try:
         reader = get_csv_input()
         csvheader = reader.fieldnames
+
+        # Memcached connection
+        mc_server = '127.0.0.1'
+        mc_port = 11211
+        mc_ttl = 14400 # Cache entry for 4 hours (mc_ttl = seconds)
+        mc_client = pylibmc.Client([':'.join([mc_server, str(mc_port)])], binary=True)
+
         #print("Header: %s" % csvheader)
         #TODO: Make the protocol version cluster-dependent
         cluster = Cluster(
@@ -148,7 +157,6 @@ def main(argv):
     # A queue for storing handles to asynchronous queries
     async_query_queue = Queue(maxsize=(40 * len(hosts)) + 1)
 
-    unique_key_combos = {}
     while True:
         row = {}
         try:
@@ -162,7 +170,7 @@ def main(argv):
                 # Block until a query is finished, when the queue is full
                 (stored_row, stored_keysig, old_future) = async_query_queue.get_nowait()
                 values = old_future.result()
-                unique_key_combos[stored_keysig] = values
+                mc_client.set(stored_keysig, values, time=mc_ttl)
                 queue_full_gets += 1
                 if len(values) > 0:
                     for result in values:
@@ -174,7 +182,8 @@ def main(argv):
         #print("Got input row: %s" % row)
         keycombo = key_combo(keycolumns, row)
         keysig = '-'.join(cfpath + sorted([str(x) for x in keycombo]))
-        if not keysig in unique_key_combos:
+        cached_keysig = mc_client.get(keysig)
+        if not cached_keysig:
             # a new key combination
             #print("db fetch")
             future = session.execute_async(lookup, keycombo)
@@ -183,8 +192,8 @@ def main(argv):
         else:
             cache_hits += 1
 
-            if len(unique_key_combos[keysig]) > 0:
-                for result in unique_key_combos[keysig]:
+            if len(cached_keysig) > 0:
+                for result in cached_keysig:
                     row.update(result)
                     writer.writerow(row)
             else:
@@ -194,8 +203,7 @@ def main(argv):
         # Drain the remainder of the queue
         (stored_row, stored_keysig, old_future) = async_query_queue.get_nowait()
         values = old_future.result()
-        # NOTE: If using persistent cache between calls of this script (memcached),
-        # set cache value here too
+        mc_client.set(stored_keysig, values, time=mc_ttl)
         queue_drain_gets += 1
         if len(values) > 0:
             for result in values:
